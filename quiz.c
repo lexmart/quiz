@@ -7,7 +7,7 @@
 #include <ctype.h>
 
 internal void
-DrawText(int X, int Y, int Width, int Height, char *String, TTF_Font *Font, SDL_Surface *ScreenSurface, SDL_Color ForegroundColor, SDL_Color BackgroundColor)
+DrawString(int X, int Y, int Width, int Height, char *String, TTF_Font *Font, SDL_Surface *ScreenSurface, SDL_Color ForegroundColor, SDL_Color BackgroundColor)
 {
     int CharactersLeft = (int)strlen(String);
     int SourceCharIndex = 0;
@@ -38,9 +38,12 @@ DrawText(int X, int Y, int Width, int Height, char *String, TTF_Font *Font, SDL_
         StringPixelHeight += LineHeight;
         
         char LastChar = String[DestCharIndex - 1];
-        if((LastChar >= 'a' && LastChar <= 'z') || 
+        if(((LastChar >= 'a' && LastChar <= 'z') ||
            (LastChar >= 'A' && LastChar <= 'Z') ||
-           (LastChar >= '0' && LastChar <= '9'))
+           (LastChar >= '0' && LastChar <= '9')) &&
+           ((String[SourceCharIndex] >= 'a' && String[SourceCharIndex] <= 'z') ||
+            (String[SourceCharIndex] >= 'a' && String[SourceCharIndex] <= 'z') ||
+            (String[SourceCharIndex] >= 'a' && String[SourceCharIndex] <= 'z')))
         {
             Hyphenate = true;
         }
@@ -52,7 +55,7 @@ DrawText(int X, int Y, int Width, int Height, char *String, TTF_Font *Font, SDL_
         SDL_BlitSurface(TextSurface, 0, ScreenSurface, &TextLocation);
         SDL_FreeSurface(TextSurface);
         
-        TextLocation.y = StringPixelHeight;
+        TextLocation.y = Y + StringPixelHeight;
         }
     }
 }
@@ -68,7 +71,7 @@ InitMemoryArena(void *Base, int Bytes)
 }
 
 internal bitmap
-LoadBitmap(char *FileName)
+LoadSprite(char *FileName)
 {
     bitmap Result = {0};
     int Components;
@@ -152,7 +155,7 @@ DrawTopic(game_state *GameState, screen *Screen, char *Topic)
     
     SDL_Color ForegroundColor = {223, 96, 14};
     SDL_Color BackgroundColor = {2, 2, 122};
-    DrawText(DrawX, DrawY, Width, Height, Topic, GameState->Font, GameState->ScreenSurface, ForegroundColor, BackgroundColor);
+    DrawString(DrawX, DrawY, Width, Height, Topic, GameState->Font, GameState->ScreenSurface, ForegroundColor, BackgroundColor);
 }
 
 // TODO: No parameter, just draw question from game_state
@@ -163,12 +166,12 @@ DrawQuestion(game_state *GameState, screen *Screen, char *Question)
     
     int DrawX = 10;
     int DrawY = PadY + 2*GameState->Bitmaps.Trebek.Height;
-    int Width = GameState->Bitmaps.Board.Width;
+    int Width = GameState->Bitmaps.Board.Width - 2*DrawX;
     int Height = GameState->Bitmaps.Board.Height;
     
     SDL_Color ForegroundColor = {223, 96, 14};
     SDL_Color BackgroundColor = {2, 2, 122};
-    DrawText(DrawX, DrawY, Width, Height, Question, GameState->Font, GameState->ScreenSurface, ForegroundColor, BackgroundColor);
+    DrawString(DrawX, DrawY, Width, Height, Question, GameState->Font, GameState->ScreenSurface, ForegroundColor, BackgroundColor);
 }
 
 internal void
@@ -191,11 +194,11 @@ DrawPlayers(game_state *GameState, screen *Screen)
         int DrawY = StartY + (PlayerIndex*GameState->Bitmaps.Player.Height) + + PlayerIndex*PadY;
         DrawBitmap(Screen, &GameState->Bitmaps.Player, DrawX + PadX, DrawY);
         
-        DrawText(DrawX + NameTextPadX, DrawY + PadY, GameState->Bitmaps.Player.Width, GameState->Bitmaps.Player.Height, Player->Name, GameState->Font, GameState->ScreenSurface, ForegroundColor, BackgroundColor);
+        DrawString(DrawX + NameTextPadX, DrawY + PadY, GameState->Bitmaps.Player.Width, GameState->Bitmaps.Player.Height, Player->Name, GameState->Font, GameState->ScreenSurface, ForegroundColor, BackgroundColor);
 
         char ScoreText[16];
         sprintf(ScoreText, "%03d", Player->Score);
-        DrawText(ScoreTextPadX + DrawX, DrawY + PadY, GameState->Bitmaps.Player.Width - ScoreTextPadX, GameState->Bitmaps.Player.Height, ScoreText, GameState->Font, GameState->ScreenSurface, ForegroundColor, BackgroundColor);
+        DrawString(ScoreTextPadX + DrawX, DrawY + PadY, GameState->Bitmaps.Player.Width - ScoreTextPadX, GameState->Bitmaps.Player.Height, ScoreText, GameState->Font, GameState->ScreenSurface, ForegroundColor, BackgroundColor);
     }
 }
 
@@ -209,7 +212,7 @@ DrawInputLine(game_state *GameState, screen *Screen)
 
     SDL_Color ForegroundColor = {223, 96, 14};
     SDL_Color BackgroundColor = {3, 3, 183};
-    DrawText(DrawX, DrawY, Width, Height, GameState->CurInputLine, GameState->Font, GameState->ScreenSurface, ForegroundColor, BackgroundColor);
+    DrawString(DrawX, DrawY, Width, Height, GameState->CurInputLine, GameState->Font, GameState->ScreenSurface, ForegroundColor, BackgroundColor);
 }
 
 internal void
@@ -316,7 +319,7 @@ CreateKeyPress(keyboard *Keyboard, memory_arena *MemoryArena, char Value, key_pr
 }
 
 internal void
-ProcessKeyboardInput(game_state *GameState, keyboard *Keyboard, memory_arena *Arena)
+ProcessKeyboardInput(game_state *GameState, network_state *NetworkState, keyboard *Keyboard, memory_arena *Arena)
 {
     if(Keyboard->Input)
     {
@@ -340,10 +343,15 @@ ProcessKeyboardInput(game_state *GameState, keyboard *Keyboard, memory_arena *Ar
         }
         else if(KeyPressed == '\r')
         {
+            #if 1
             // TODO: Move this code. This shoulding be pushing CurInputLine up to the server, not putting in message queue
+            GameState->CurInputLine[GameState->InputLineLength - 1] = 0;
             chat_message *NewMessage = CreateMessage(GameState, Arena, GameState->CurInputLine, 0);
             NewMessage->Next = GameState->Messages;
             GameState->Messages = NewMessage;
+            
+            SendChatMessage(NetworkState, NewMessage);
+            #endif
             
             GameState->InputLineLength = 0;
             GameState->CurInputLine[0] = 0;
@@ -365,27 +373,54 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
     {
         GameState->Initialized = true;
         
-        GameState->Bitmaps.Trebek = LoadBitmap("data/trebek.png");
-        GameState->Bitmaps.Players = LoadBitmap("data/players.png");
-        GameState->Bitmaps.Player = LoadBitmap("data/player.png");
-        GameState->Bitmaps.Board = LoadBitmap("data/board.png");
+        network_state *NetworkState = PushStruct(network_state, Arena);
+        ConnectToServer(NetworkState, "Jose");
+        GetPlayerList(NetworkState, &GameState->Players[0], ArrayCount(GameState->Players));
+        ReceiveQuestion(NetworkState, &GameState->Q);
+        GameState->NetworkState = NetworkState;
+        
+        GameState->Bitmaps.Trebek = LoadSprite("data/trebek.png");
+        GameState->Bitmaps.Players = LoadSprite("data/players.png");
+        GameState->Bitmaps.Player = LoadSprite("data/player.png");
+        GameState->Bitmaps.Board = LoadSprite("data/board.png");
         
         AddPlayer(GameState, "Chaz");
         AddPlayer(GameState, "Clay");
         AddPlayer(GameState, "Lex");
+        
+        FILE *FileHandle = fopen("test.txt", "r");
+        char CurChar = 'a';
+        int NumLines = 0;
+        while(CurChar != EOF)
+        {
+            CurChar= fgetc(FileHandle);
+            if(CurChar == '\n')
+            {
+                NumLines++;
+            }
+        }
+        fclose(FileHandle);
+        
+        
+        FileHandle = fopen("test.txt", "r");
+         GameState->Q = GenerateQuestion(FileHandle);
+        
+        printf("%d\n", NumLines);
     }
+    
+    network_state *NetworkState = (network_state *)GameState->NetworkState;
     
     UpdatePlayerScore(GameState, "lex", 45);
     UpdatePlayerScore(GameState, "clay", 69);
     UpdatePlayerScore(GameState, "chaz", 45150);
     SortPlayersByScore(GameState);
     
-    ProcessKeyboardInput(GameState, Keyboard, Arena);
+    ProcessKeyboardInput(GameState, NetworkState, Keyboard, Arena);
     
     DrawUserInterface(GameState, Screen);
     DrawPlayers(GameState, Screen);
-    DrawQuestion(GameState, Screen, "who was the first person to walk on the moon ?");
-    DrawTopic(GameState, Screen, "this is an open question to the ladies");
+    DrawQuestion(GameState, Screen, GameState->Q.Question);
+    DrawTopic(GameState, Screen, GameState->Q.Category);
     DrawInputLine(GameState, Screen);
     
     int DrawX = 10;
@@ -399,7 +434,7 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
     int MinY = 150 + GameState->Bitmaps.Trebek.Height;
     while(CurMessage && (DrawY > MinY))
     {
-        DrawText(DrawX, DrawY, MessageWidth, MessageHeight, CurMessage->Value, GameState->Font, GameState->ScreenSurface,
+        DrawString(DrawX, DrawY, MessageWidth, MessageHeight, CurMessage->Value, GameState->Font, GameState->ScreenSurface,
                  ForegroundColor, BackgroundColor);
         CurMessage = CurMessage->Next;
         DrawY -= MessageHeight;

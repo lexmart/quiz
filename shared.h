@@ -1,3 +1,5 @@
+#ifndef SHARED_H
+
 #include <stdint.h>
 #include <limits.h>
 
@@ -69,3 +71,13 @@ typedef enum
 {
     PacketType_PlayerList,
 } packet_type;
+
+typedef struct
+{
+    char Question[640];
+    char Answer[640];
+    char Category[640];
+} question;
+
+#define SHARED_H
+#endif

@@ -1,14 +1,17 @@
 #include "stdio.h"
 #include "shared.h"
+#include "quiz_questions.c"
 
 #define PACKET_SIZE 2048
 #define SERVER_PORT "5658"
 #define SILENT_ERROR 1
 #include "networking.h"
 
+// skip if everyone says "skip"? or maybe just keep the session short?
+
 int main(int NumArguments, char *Arguments[])
 {
-	if (NumArguments >= 2)
+	if(NumArguments >= 2)
 	{
 		char *NumPlayersString = Arguments[1];
 		int NumPlayers = atoi(NumPlayersString);
@@ -16,14 +19,16 @@ int main(int NumArguments, char *Arguments[])
 
 		NetworkStartup();
 		SOCKET ListenSocket = Listen(SERVER_PORT);
-		for (int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
+		for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
 		{
 			PlayerSockets[PlayerIndex] = Accept(ListenSocket);
+              u_long Mode = 1;
+            ioctlsocket(PlayerSockets[PlayerIndex], FIONBIO, &Mode);
 		}
 
 		player Players[8] = { 0 };
 
-		for (int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
+		for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
 		{
 			SOCKET ClientSocket = PlayerSockets[PlayerIndex];
 
@@ -37,13 +42,39 @@ int main(int NumArguments, char *Arguments[])
 			printf("%s has joined\n", Buffer);
 		}
 
-		for (int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
+		for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
 		{
 			SOCKET ClientSocket = PlayerSockets[PlayerIndex];
 			Send(ClientSocket, (char *)Players, sizeof(Players));
 		}
-
-		for (int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
+        
+        FILE *FileHandle = fopen("test.txt", "r");
+        question Question = GenerateQuestion(FileHandle);
+        
+        for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
+        {
+            SOCKET ClientSocket = PlayerSockets[PlayerIndex];
+            Send(ClientSocket, (char *)&Question, sizeof(question));
+        }
+        
+        #if 1
+        while(true)
+        {
+        for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
+        {
+            SOCKET ClientSocket = PlayerSockets[PlayerIndex];
+            char Buffer[PACKET_SIZE] = {0};
+            int BytesRead = Recieve(ClientSocket, Buffer, PACKET_SIZE);
+            
+            if(BytesRead != -1)
+            {
+                printf("%s\n", Buffer);
+            }
+        }
+    }
+    #endif
+        
+		for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
 		{
 			SOCKET ClientSocket = PlayerSockets[PlayerIndex];
 			closesocket(ClientSocket);

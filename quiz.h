@@ -55,6 +55,10 @@ typedef struct
     
     chat_message *Messages;
     chat_message *FreeMessages;
+    
+    question Q;
+    
+    void *NetworkState;
 } game_state;
 
 #define QUIZ_H

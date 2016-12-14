@@ -1,10 +1,13 @@
 #ifndef QUIZ_SDL_C
 
-#include <stdio.h>
+#include "stdio.h"
+#include "stdlib.h"
 #include "SDL.h"
 #include "SDL_TTF.h"
 
 #include "shared.h"
+#include "quiz_questions.c"
+#include "quiz_client.c"
 #include "quiz.c"
 
 int main(int argc, char *argv[])
