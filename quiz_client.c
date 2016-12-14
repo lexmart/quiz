@@ -17,17 +17,25 @@ internal void
 ConnectToServer(network_state *Result, char *Name)
 {
     NetworkStartup();
+    printf("10.91.7.2");
     SOCKET ServerSocket = Connect("10.91.7.2", SERVER_PORT);
+    printf("10.91.7.2");
     Result->ServerSocket = ServerSocket;
     u_long Mode = 1;
     ioctlsocket(ServerSocket, FIONBIO, &Mode);
+    Sleep(1000);
     Send(ServerSocket, Name, (int)strlen(Name) + 1);
 }
 
 internal void
 GetPlayerList(network_state *NetworkState, player *Players, int PlayersLength)
 {
-    while(Recieve(NetworkState->ServerSocket, (char *)Players, sizeof(player)*PlayersLength) <= 0);
+    int BytesReceived = -1;
+    while(BytesReceived <= 0)
+    {
+        BytesReceived = Recieve(NetworkState->ServerSocket, (char *)Players, sizeof(player)*PlayersLength);
+        Sleep(10);
+    }
     for(int PlayerIndex = 0; PlayerIndex < PlayersLength; PlayerIndex++)
     {
         player *Player = Players + PlayerIndex;
@@ -41,7 +49,10 @@ GetPlayerList(network_state *NetworkState, player *Players, int PlayersLength)
 internal void
 ReceiveQuestion(network_state *NetworkState, question *Question)
 {
-    while(Recieve(NetworkState->ServerSocket, (char *)Question, sizeof(question)) <= 0);
+    while(Recieve(NetworkState->ServerSocket, (char *)Question, sizeof(question)) <= 0)
+    {
+        Sleep(10);
+    }
     
     printf("category: %s\n", Question->Category);
     printf("question: %s\n", Question->Question);

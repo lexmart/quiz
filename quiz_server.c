@@ -9,6 +9,13 @@
 
 // skip if everyone says "skip"? or maybe just keep the session short?
 
+/*
+TODO
+Implement commands such as 
+!skip - skips current question (we'll probably have long period like 45sec/question)
+Maybe have GenerateQuestion jump to new category once its done with category stream?
+*/
+
 internal void
 BroadcastMessage(SOCKET *PlayerSockets, int NumPlayers, chat_message *Message)
 {
@@ -43,10 +50,15 @@ int main(int NumArguments, char *Arguments[])
 			SOCKET ClientSocket = PlayerSockets[PlayerIndex];
 
 			char Buffer[PACKET_SIZE] = { 0 };
-			int BytesReceived = Recieve(ClientSocket, Buffer, PACKET_SIZE);
+            int BytesReceived = -1;
+            while(BytesReceived <= 0)
+            {
+                BytesReceived = Recieve(ClientSocket, Buffer, PACKET_SIZE);
+            }
 
+            int MaxPlayerNameLength = 14;
 			player *Player = &Players[PlayerIndex];
-			strncpy(Player->Name, Buffer, ArrayCount(Player->Name));
+			strncpy(Player->Name, Buffer, MaxPlayerNameLength);
 			Player->Score = 0;
 
 			printf("%s has joined\n", Buffer);
@@ -60,6 +72,8 @@ int main(int NumArguments, char *Arguments[])
         
         FILE *FileHandle = fopen("test.txt", "r");
         question Question = GenerateQuestion(FileHandle);
+        Question = GenerateQuestion(FileHandle);
+        Question = GenerateQuestion(FileHandle);
         
         for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
         {
@@ -67,7 +81,6 @@ int main(int NumArguments, char *Arguments[])
             Send(ClientSocket, (char *)&Question, sizeof(question));
         }
         
-        #if 1
         while(true)
         {
         for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
@@ -81,11 +94,16 @@ int main(int NumArguments, char *Arguments[])
                 if(strlen(ChatMessage.Value) > 0)
                 {
                     BroadcastMessage(PlayerSockets, NumPlayers, &ChatMessage);
+                    if(!strcmp(ChatMessage.Value, Question.Answer))
+                    {
+                        chat_message Message;
+                        strncpy(Message.Value, "Correct", ArrayCount(Message.Value));
+                        BroadcastMessage(PlayerSockets, NumPlayers, &Message);
+                    }
             }
         }
         }
     }
-    #endif
         
 		for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
 		{

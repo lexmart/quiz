@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
             
             game_state *GameState = (game_state *)Memory;
             GameState->ScreenSurface = ScreenSurface;
-            GameState->Font = TTF_OpenFont("Liberation-Mono.TTF", 12);
+            GameState->Font = TTF_OpenFont("Liberation-Mono.TTF", 13);
             GameState->Arena = InitMemoryArena((u8 *)Memory + sizeof(game_state), 
                                                MemoryInBytes - sizeof(game_state));
             
@@ -60,6 +60,12 @@ int main(int argc, char *argv[])
                         case SDL_KEYDOWN:
                         {
                             int KeyValue = Event.key.keysym.sym;
+                            if((Event.key.keysym.mod & KMOD_LSHIFT) || (Event.key.keysym.mod & KMOD_RSHIFT))
+                            {
+                                if(KeyValue >= 'a' && KeyValue <= 'z') { KeyValue = toupper(KeyValue); }
+                                else if(KeyValue == '1') { KeyValue = '!'; }
+                                else if(KeyValue == '/') { KeyValue = '?'; }
+                            }
                             key_press *NewKeyPress = CreateKeyPress(&Keyboard, &GameState->Arena, KeyValue, ReversedInput);
                             NewKeyPress->Next = ReversedInput;
                             ReversedInput = NewKeyPress;

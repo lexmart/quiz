@@ -137,7 +137,7 @@ IsValidDrawCharacter(char Char)
 {
     b32 Result = (((Char >= 'a') && (Char <= 'z')) || ((Char >= 'A') && (Char <= 'Z')) ||
                   ((Char >= '0') && (Char <= '9')) || (Char == '!') || (Char == '?') ||
-                  (Char == ' '));
+                  (Char == ' ') || (Char == '\''));
     
     return Result;
 }
@@ -208,7 +208,7 @@ DrawInputLine(game_state *GameState, screen *Screen)
     int DrawX = 10;
     int DrawY = GameState->Bitmaps.Board.Height + GameState->Bitmaps.Trebek.Height - 40;
     int Width = GameState->Bitmaps.Board.Width - 2*DrawX;
-    int Height = 15;
+    int Height = 17;
 
     SDL_Color ForegroundColor = {223, 96, 14};
     SDL_Color BackgroundColor = {3, 3, 183};
@@ -367,7 +367,7 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
         GameState->Initialized = true;
         
         network_state *NetworkState = PushStruct(network_state, Arena);
-        ConnectToServer(NetworkState, "Jose");
+        ConnectToServer(NetworkState, "Jose Rodriguez Antonio");
         GetPlayerList(NetworkState, &GameState->Players[0], ArrayCount(GameState->Players));
         ReceiveQuestion(NetworkState, &GameState->Q);
         GameState->NetworkState = NetworkState;
@@ -427,7 +427,7 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
     
     int DrawX = 10;
     int DrawY = GameState->Bitmaps.Board.Height + GameState->Bitmaps.Trebek.Height - 70;
-    int MessageHeight = 15;
+    int MessageHeight = 17;
     int MessageWidth = GameState->Bitmaps.Board.Width - 2*DrawX;
     chat_message *CurMessage = GameState->Messages;
     SDL_Color ForegroundColor = {223, 96, 14};

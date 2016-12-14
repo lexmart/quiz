@@ -19,7 +19,7 @@ GenerateQuestion(FILE *FileHandle)
     }
     
     CharIndex = 0;
-    while((Char = fgetc(FileHandle)) != '|')
+    while((Char = fgetc(FileHandle)) != '\n')
     {
         Result.Answer[CharIndex++] = Char;
     }
@@ -28,7 +28,15 @@ GenerateQuestion(FILE *FileHandle)
     // TODO: Don't close the filehandle, move it up to the next question.
     // TODO: If there's no next question, then close FileHandle and open new FileHandle at random location
     // TODO: On serverside, if everyone says "skip", then the server just jumps to a new random place in the file!
-    fclose(FileHandle);
+    
+    if(fgetc(FileHandle) == '|')
+    {
+    ungetc('|', FileHandle);
+    }
+    else
+    {
+        InvalidCodePath;
+    }
     
     return Result;
 }
