@@ -9,6 +9,16 @@
 
 // skip if everyone says "skip"? or maybe just keep the session short?
 
+internal void
+BroadcastMessage(SOCKET *PlayerSockets, int NumPlayers, chat_message *Message)
+{
+    for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
+    {
+        SOCKET ClientSocket = PlayerSockets[PlayerIndex];
+        Send(ClientSocket, (char *)Message, sizeof(chat_message));
+    }
+}
+
 int main(int NumArguments, char *Arguments[])
 {
 	if(NumArguments >= 2)
@@ -63,13 +73,16 @@ int main(int NumArguments, char *Arguments[])
         for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
         {
             SOCKET ClientSocket = PlayerSockets[PlayerIndex];
-            char Buffer[PACKET_SIZE] = {0};
-            int BytesRead = Recieve(ClientSocket, Buffer, PACKET_SIZE);
+            chat_message ChatMessage;
+            int BytesRead = Recieve(ClientSocket, (char *)&ChatMessage, sizeof(chat_message));
             
-            if(BytesRead != -1)
+            if(BytesRead > 0)
             {
-                printf("%s\n", Buffer);
+                if(strlen(ChatMessage.Value) > 0)
+                {
+                    BroadcastMessage(PlayerSockets, NumPlayers, &ChatMessage);
             }
+        }
         }
     }
     #endif

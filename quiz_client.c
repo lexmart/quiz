@@ -3,7 +3,7 @@
 
 #define PACKET_SIZE 2048
 #define SERVER_PORT "5658"
-#define SILENT_ERROR 1
+#define SILENT_ERROR 0
 #include "networking.h"
 
 typedef struct
@@ -17,15 +17,17 @@ internal void
 ConnectToServer(network_state *Result, char *Name)
 {
     NetworkStartup();
-    SOCKET ServerSocket = Connect("132.161.242.190", SERVER_PORT);
+    SOCKET ServerSocket = Connect("10.91.7.2", SERVER_PORT);
     Result->ServerSocket = ServerSocket;
+    u_long Mode = 1;
+    ioctlsocket(ServerSocket, FIONBIO, &Mode);
     Send(ServerSocket, Name, (int)strlen(Name) + 1);
 }
 
 internal void
 GetPlayerList(network_state *NetworkState, player *Players, int PlayersLength)
 {
-    Recieve(NetworkState->ServerSocket, (char *)Players, sizeof(player)*PlayersLength);
+    while(Recieve(NetworkState->ServerSocket, (char *)Players, sizeof(player)*PlayersLength) <= 0);
     for(int PlayerIndex = 0; PlayerIndex < PlayersLength; PlayerIndex++)
     {
         player *Player = Players + PlayerIndex;
@@ -39,7 +41,8 @@ GetPlayerList(network_state *NetworkState, player *Players, int PlayersLength)
 internal void
 ReceiveQuestion(network_state *NetworkState, question *Question)
 {
-    Recieve(NetworkState->ServerSocket, (char *)Question, sizeof(question));
+    while(Recieve(NetworkState->ServerSocket, (char *)Question, sizeof(question)) <= 0);
+    
     printf("category: %s\n", Question->Category);
     printf("question: %s\n", Question->Question);
     printf("question: %s\n", Question->Answer);
@@ -49,6 +52,20 @@ internal void
 SendChatMessage(network_state *NetworkState, chat_message *Message)
 {
     Send(NetworkState->ServerSocket, (char *)Message, sizeof(chat_message));
+}
+
+internal b32
+ReceiveChatMessage(network_state *NetworkState, chat_message *Message)
+{
+     int BytesRecieved = Recieve(NetworkState->ServerSocket, (char *)Message, sizeof(chat_message));
+    
+    if(BytesRecieved > 0)
+    {
+    printf("%d\n", BytesRecieved);
+    }
+    b32 Result = (BytesRecieved > 0);
+    
+    return Result;
 }
 
 #if 0

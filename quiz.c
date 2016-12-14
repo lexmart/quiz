@@ -343,15 +343,8 @@ ProcessKeyboardInput(game_state *GameState, network_state *NetworkState, keyboar
         }
         else if(KeyPressed == '\r')
         {
-            #if 1
-            // TODO: Move this code. This shoulding be pushing CurInputLine up to the server, not putting in message queue
-            GameState->CurInputLine[GameState->InputLineLength - 1] = 0;
             chat_message *NewMessage = CreateMessage(GameState, Arena, GameState->CurInputLine, 0);
-            NewMessage->Next = GameState->Messages;
-            GameState->Messages = NewMessage;
-            
             SendChatMessage(NetworkState, NewMessage);
-            #endif
             
             GameState->InputLineLength = 0;
             GameState->CurInputLine[0] = 0;
@@ -379,14 +372,19 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
         ReceiveQuestion(NetworkState, &GameState->Q);
         GameState->NetworkState = NetworkState;
         
+        for(int PlayerIndex = 0; PlayerIndex < ArrayCount(GameState->Players); PlayerIndex++)
+        {
+            player *Player = GameState->Players + PlayerIndex;
+            if(Player->Name[0] != 0)
+            {
+                AddPlayer(GameState, &Player->Name[0]);
+            }
+        }
+        
         GameState->Bitmaps.Trebek = LoadSprite("data/trebek.png");
         GameState->Bitmaps.Players = LoadSprite("data/players.png");
         GameState->Bitmaps.Player = LoadSprite("data/player.png");
         GameState->Bitmaps.Board = LoadSprite("data/board.png");
-        
-        AddPlayer(GameState, "Chaz");
-        AddPlayer(GameState, "Clay");
-        AddPlayer(GameState, "Lex");
         
         FILE *FileHandle = fopen("test.txt", "r");
         char CurChar = 'a';
@@ -410,9 +408,13 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
     
     network_state *NetworkState = (network_state *)GameState->NetworkState;
     
-    UpdatePlayerScore(GameState, "lex", 45);
-    UpdatePlayerScore(GameState, "clay", 69);
-    UpdatePlayerScore(GameState, "chaz", 45150);
+    chat_message TestMessage = {0};
+    while(ReceiveChatMessage(NetworkState, &TestMessage))
+    {
+        chat_message *NewMessage = CreateMessage(GameState, Arena, TestMessage.Value, GameState->Messages);
+        GameState->Messages = NewMessage;
+    }
+    
     SortPlayersByScore(GameState);
     
     ProcessKeyboardInput(GameState, NetworkState, Keyboard, Arena);

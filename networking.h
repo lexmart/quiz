@@ -36,7 +36,7 @@ Connect(char *Address, char *Port)
             if(debug != 0)
             {
                 Result = INVALID_SOCKET;
-                Error("Connect->connect");
+                Error("Connect->could not connect");
             }
             else
             {
@@ -115,7 +115,7 @@ Send(SOCKET Socket, char *Input, int InputLength)
     memcpy(Packet, Input, InputLength);
     if(send(Socket, Packet, PACKET_SIZE, 0) == SOCKET_ERROR)
     {
-        printf("send failed\n");
+        Error("send failed\n");
     }
 }
 
