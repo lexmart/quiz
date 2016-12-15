@@ -36,6 +36,11 @@ typedef int b32;
 
 #define InvalidCodePath Assert(!"Invalid code path");
 
+#define GetArrayPointer(Array, Width, Row, Col) ((Array) + (Width)*(Row) + Col)
+
+#define Min(A, B) (((A) <= (B)) ? (A) : (B))
+#define Max(A, B) (((A) >= (B)) ? (A) : (B))
+
 /* NOTE: Data structures shared between platform and game */
 
 typedef struct

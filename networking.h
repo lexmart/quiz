@@ -6,6 +6,7 @@ typedef enum
 {
     PacketType_PlayerList,
     PacketType_ChatMessage,
+    PacketType_Winner,
     PacketType_Question,
     PacketType_Name
 } packet_type;

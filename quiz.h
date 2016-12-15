@@ -55,7 +55,7 @@ typedef struct
     chat_message *Messages;
     chat_message *FreeMessages;
     
-    question Q;
+    question CurrentQuestion;
     
     void *NetworkState;
 } game_state;

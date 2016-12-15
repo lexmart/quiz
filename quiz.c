@@ -366,6 +366,8 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
     
     if(!GameState->Initialized)
     {
+        GetEditDistance("gumbo", "gambol");
+        
         GameState->Initialized = true;
         
         network_state *NetworkState = PushStruct(network_state, Arena);
@@ -401,11 +403,7 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
         }
         fclose(FileHandle);
         
-        
-        FileHandle = fopen("test.txt", "r");
-         GameState->Q = GenerateQuestion(FileHandle);
-        
-        printf("%d\n", NumLines);
+         GameState->Messages = CreateMessage(GameState, Arena, "Waiting for server...", 0);
     }
     
     network_state *NetworkState = (network_state *)GameState->NetworkState;
@@ -425,9 +423,19 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
                 chat_message *NewMessage = CreateMessage(GameState, Arena, RawMessage, GameState->Messages);
                 GameState->Messages = NewMessage;
             } break;
+            case PacketType_Winner:
+            {
+                char *RawMessage = ((chat_message *)IncomingPacket.Contents)->Value;
+                chat_message *NewMessage = CreateMessage(GameState, Arena, RawMessage, GameState->Messages);
+                GameState->Messages = NewMessage;
+                
+                chat_message *NewRound = CreateMessage(GameState, Arena, "--------------------------------", GameState->Messages);
+                GameState->Messages = NewRound;
+            };
             case PacketType_Question:
             {
-                printf("got a question");
+                question *NewQuestion = (question *)&IncomingPacket.Contents;
+                memcpy(&GameState->CurrentQuestion, NewQuestion, sizeof(question));
             } break;
     }
     }
@@ -438,8 +446,7 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
     
     DrawUserInterface(GameState, Screen);
     DrawPlayers(GameState, Screen);
-    DrawQuestion(GameState, Screen, GameState->Q.Question);
-    DrawTopic(GameState, Screen, GameState->Q.Category);
+    DrawTopic(GameState, Screen, GameState->CurrentQuestion.Category);
     DrawInputLine(GameState, Screen);
     
     int DrawX = 10;
@@ -458,6 +465,8 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
         CurMessage = CurMessage->Next;
         DrawY -= MessageHeight;
     }
+    
+    DrawQuestion(GameState, Screen, GameState->CurrentQuestion.Question);
 }
 
 #define QUIZ_C

@@ -65,7 +65,17 @@ int main(int NumArguments, char *Arguments[])
 
 			printf("%s has joined\n", Player->Name);
 		}
-
+        
+        r32 CorrectAnswerScore = 0.8f;
+        char WelcomeMessage[512];
+        sprintf(WelcomeMessage, "Alex Trebek: Welcome to Jeopardy, I'm your host, Alex Trebrek.");
+        packet WelcomeMessagePacket = BuildPacket(PacketType_ChatMessage, (char *)WelcomeMessage, (int)strlen(WelcomeMessage));
+        BroadcastPacket(PlayerSockets, NumPlayers, &WelcomeMessagePacket);
+        sprintf(WelcomeMessagePacket.Contents, "Alex Trebek: Correct answers must score at least %.2f", CorrectAnswerScore);
+        BroadcastPacket(PlayerSockets, NumPlayers, &WelcomeMessagePacket);
+        sprintf(WelcomeMessagePacket.Contents, "Alex Trebek: Good luck.", CorrectAnswerScore);
+        BroadcastPacket(PlayerSockets, NumPlayers, &WelcomeMessagePacket);
+        
         packet PlayerListPacket = BuildPacket(PacketType_PlayerList, (char *)&Players, sizeof(Players));
         BroadcastPacket(PlayerSockets, NumPlayers, &PlayerListPacket);
         
@@ -83,17 +93,13 @@ int main(int NumArguments, char *Arguments[])
         Question = GenerateQuestion(FileHandle);
         
         packet QuestionPacket = BuildPacket(PacketType_Question, (char *)&Question, sizeof(question));
-        
-        for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
-        {
-            SOCKET ClientSocket = PlayerSockets[PlayerIndex];
-            Send(ClientSocket, &QuestionPacket);
-        }
+        BroadcastPacket(PlayerSockets, NumPlayers, &QuestionPacket);
         
         while(true)
         {
         for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
         {
+            player *Player = &Players.Contents[PlayerIndex];
             SOCKET ClientSocket = PlayerSockets[PlayerIndex];
             packet ReceivedPacket = {0};
             int BytesRead = Recieve(ClientSocket, &ReceivedPacket);
@@ -109,17 +115,43 @@ int main(int NumArguments, char *Arguments[])
                         
                         if(strlen(ChatMessage->Value) > 0)
                         {
-                            BroadcastPacket(PlayerSockets, NumPlayers, &ReceivedPacket);
+                            chat_message PlayerMessage = {0};
+                            sprintf(&PlayerMessage.Value[0], "%s: %s", Player->Name, ReceivedPacket.Contents);
+                            packet PlayerMessagePacket = 
+                                BuildPacket(PacketType_ChatMessage, (char *)&PlayerMessage, sizeof(chat_message));
+                            BroadcastPacket(PlayerSockets, NumPlayers, &PlayerMessagePacket);
                             
-                            if(!strcmp(ChatMessage->Value, Question.Answer))
+                            r32 AnswerScore = 1.0f - NormalizedDistance(ChatMessage->Value, &Question);
+                            
+                            if(AnswerScore >= CorrectAnswerScore)
                             {
                                 chat_message ResponseMessage;
-                                strncpy(ResponseMessage.Value, "Correct", ArrayCount(ResponseMessage.Value));
+                                sprintf(ResponseMessage.Value, "Alex Trebek: %s wins the round (answer score was %.2f)", 
+                                        Player->Name, AnswerScore);
                                 
-                                packet CorrectResponsePacket = BuildPacket(PacketType_ChatMessage,
+                                packet CorrectResponsePacket = BuildPacket(PacketType_Winner,
                                                                            (char *)&ResponseMessage,
-                                                                           sizeof(chat_message));
+                                                                           sizeof(CorrectResponsePacket));
                                 BroadcastPacket(PlayerSockets, NumPlayers, &CorrectResponsePacket);
+                                
+                                Question = GenerateQuestion(FileHandle);
+                                QuestionPacket = BuildPacket(PacketType_Question, (char *)&Question, sizeof(question));
+                                BroadcastPacket(PlayerSockets, NumPlayers, &QuestionPacket);
+                                
+                                Player->Score++;
+                                PlayerListPacket = BuildPacket(PacketType_PlayerList, (char *)&Players, sizeof(Players));
+                                BroadcastPacket(PlayerSockets, NumPlayers, &PlayerListPacket);
+                            }
+                            else
+                            {
+                                chat_message ResponseMessage;
+                                sprintf(ResponseMessage.Value, "Alex Trebek: %s has score %.2f", 
+                                        ReceivedPacket.Contents, AnswerScore);
+                                
+                                packet IncorrectResponsePacket = BuildPacket(PacketType_ChatMessage,
+                                                                             (char *)&ResponseMessage,
+                                                                             sizeof(ResponseMessage));
+                                BroadcastPacket(PlayerSockets, NumPlayers, &IncorrectResponsePacket);
                             }
                         }
                     } break;
