@@ -1,11 +1,12 @@
 #include "stdio.h"
-#include "shared.h"
-#include "quiz_questions.c"
 
 #define PACKET_SIZE 2048
 #define SERVER_PORT "5658"
 #define SILENT_ERROR 1
+
 #include "networking.h"
+#include "shared.h"
+#include "quiz_questions.c"
 
 // skip if everyone says "skip"? or maybe just keep the session short?
 
@@ -17,12 +18,12 @@ Maybe have GenerateQuestion jump to new category once its done with category str
 */
 
 internal void
-BroadcastMessage(SOCKET *PlayerSockets, int NumPlayers, chat_message *Message)
+BroadcastPacket(SOCKET *PlayerSockets, int NumPlayers, packet *Packet)
 {
     for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
     {
-        SOCKET ClientSocket = PlayerSockets[PlayerIndex];
-        Send(ClientSocket, (char *)Message, sizeof(chat_message));
+        SOCKET PlayerSocket = PlayerSockets[PlayerIndex];
+        Send(PlayerSocket, Packet);
     }
 }
 
@@ -43,42 +44,50 @@ int main(int NumArguments, char *Arguments[])
             ioctlsocket(PlayerSockets[PlayerIndex], FIONBIO, &Mode);
 		}
 
-		player Players[8] = { 0 };
+        player_list Players = {0};
+        Players.NumPlayers = NumPlayers;
 
 		for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
 		{
 			SOCKET ClientSocket = PlayerSockets[PlayerIndex];
 
-			char Buffer[PACKET_SIZE] = { 0 };
-            int BytesReceived = -1;
-            while(BytesReceived <= 0)
+            packet Packet = {0};
+            while(Recieve(ClientSocket, &Packet) <= 0)
             {
-                BytesReceived = Recieve(ClientSocket, Buffer, PACKET_SIZE);
+                Sleep(10);
             }
+            Assert(Packet.PacketType == PacketType_Name);
 
             int MaxPlayerNameLength = 14;
-			player *Player = &Players[PlayerIndex];
-			strncpy(Player->Name, Buffer, MaxPlayerNameLength);
+			player *Player = &Players.Contents[PlayerIndex];
+			strncpy(Player->Name, Packet.Contents, MaxPlayerNameLength);
 			Player->Score = 0;
 
-			printf("%s has joined\n", Buffer);
+			printf("%s has joined\n", Player->Name);
 		}
 
+        packet PlayerListPacket = BuildPacket(PacketType_PlayerList, (char *)&Players, sizeof(Players));
+        BroadcastPacket(PlayerSockets, NumPlayers, &PlayerListPacket);
+        
+        #if 0
 		for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
 		{
 			SOCKET ClientSocket = PlayerSockets[PlayerIndex];
 			Send(ClientSocket, (char *)Players, sizeof(Players));
 		}
+        #endif
         
         FILE *FileHandle = fopen("test.txt", "r");
         question Question = GenerateQuestion(FileHandle);
         Question = GenerateQuestion(FileHandle);
         Question = GenerateQuestion(FileHandle);
         
+        packet QuestionPacket = BuildPacket(PacketType_Question, (char *)&Question, sizeof(question));
+        
         for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
         {
             SOCKET ClientSocket = PlayerSockets[PlayerIndex];
-            Send(ClientSocket, (char *)&Question, sizeof(question));
+            Send(ClientSocket, &QuestionPacket);
         }
         
         while(true)
@@ -86,21 +95,35 @@ int main(int NumArguments, char *Arguments[])
         for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
         {
             SOCKET ClientSocket = PlayerSockets[PlayerIndex];
-            chat_message ChatMessage;
-            int BytesRead = Recieve(ClientSocket, (char *)&ChatMessage, sizeof(chat_message));
+            packet ReceivedPacket = {0};
+            int BytesRead = Recieve(ClientSocket, &ReceivedPacket);
             
             if(BytesRead > 0)
             {
-                if(strlen(ChatMessage.Value) > 0)
+                switch(ReceivedPacket.PacketType)
                 {
-                    BroadcastMessage(PlayerSockets, NumPlayers, &ChatMessage);
-                    if(!strcmp(ChatMessage.Value, Question.Answer))
+                    case PacketType_ChatMessage:
                     {
-                        chat_message Message;
-                        strncpy(Message.Value, "Correct", ArrayCount(Message.Value));
-                        BroadcastMessage(PlayerSockets, NumPlayers, &Message);
-                    }
-            }
+                        printf("received chat message\n");
+                        chat_message *ChatMessage = (chat_message *)&ReceivedPacket.Contents;
+                        
+                        if(strlen(ChatMessage->Value) > 0)
+                        {
+                            BroadcastPacket(PlayerSockets, NumPlayers, &ReceivedPacket);
+                            
+                            if(!strcmp(ChatMessage->Value, Question.Answer))
+                            {
+                                chat_message ResponseMessage;
+                                strncpy(ResponseMessage.Value, "Correct", ArrayCount(ResponseMessage.Value));
+                                
+                                packet CorrectResponsePacket = BuildPacket(PacketType_ChatMessage,
+                                                                           (char *)&ResponseMessage,
+                                                                           sizeof(chat_message));
+                                BroadcastPacket(PlayerSockets, NumPlayers, &CorrectResponsePacket);
+                            }
+                        }
+                    } break;
+                }
         }
         }
     }

@@ -5,6 +5,10 @@
 #include "SDL.h"
 #include "SDL_TTF.h"
 
+#define PACKET_SIZE 2048
+#define SERVER_PORT "5658"
+#define SILENT_ERROR 0
+
 #include "shared.h"
 #include "quiz_questions.c"
 #include "quiz_client.c"

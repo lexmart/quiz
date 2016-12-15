@@ -1,7 +1,37 @@
+#ifndef NETWORKING_H
+
+#include "memory.h"
+
+typedef enum
+{
+    PacketType_PlayerList,
+    PacketType_ChatMessage,
+    PacketType_Question,
+    PacketType_Name
+} packet_type;
+
+typedef struct
+{
+    packet_type PacketType;
+    char Contents[PACKET_SIZE];
+    int BytesUsed;
+} packet;
+
+ packet
+BuildPacket(packet_type PacketType, char *SourceBytes, int SourceLength)
+{
+    packet Packet = {0};
+    Packet.PacketType = PacketType;
+    Packet.BytesUsed = SourceLength;
+    memcpy(Packet.Contents, SourceBytes, SourceLength);
+    
+    return Packet;
+}
+
 #include "winsock2.h"
 #include "Ws2tcpip.h"
-
 #include "windows.h"
+
 #define Error(Message) if(SILENT_ERROR) { printf(Message); exit(0); } else { printf(Message); MessageBox(0, Message, 0, MB_OK); exit(0); }
 
 void
@@ -109,24 +139,21 @@ Accept(SOCKET ListenSocket)
 }
 
 void
-Send(SOCKET Socket, char *Input, int InputLength)
+Send(SOCKET Socket, packet *Packet)
 {
-    char Packet[PACKET_SIZE] = {0};
-    memcpy(Packet, Input, InputLength);
-    if(send(Socket, Packet, PACKET_SIZE, 0) == SOCKET_ERROR)
+    if(send(Socket, (char *)Packet, sizeof(packet), 0) == SOCKET_ERROR)
     {
         Error("send failed\n");
     }
 }
 
 int
-Recieve(SOCKET Socket, char *Output, int OutputLength)
+Recieve(SOCKET Socket, packet *Packet)
 {
-    char Packet[PACKET_SIZE] = {0};
-    
-    int Bytes = recv(Socket, Packet, PACKET_SIZE, 0);
-    
-    memcpy(Output, Packet, OutputLength);
+    int Bytes = recv(Socket, (char *)Packet, sizeof(packet), 0);
     
     return Bytes;
 }
+
+#define NETWORKING_H
+#endif

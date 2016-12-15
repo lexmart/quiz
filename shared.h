@@ -2,6 +2,9 @@
 
 #include <stdint.h>
 #include <limits.h>
+#include <stdlib.h>
+#include <memory.h>
+#include "networking.h"
 
 typedef uint8_t u8;
 typedef uint16_t u16;
@@ -61,16 +64,17 @@ typedef struct player
     char Name[64];
 } player;
 
+typedef struct
+{
+    player Contents[8];
+    int NumPlayers;
+} player_list;
+
 typedef struct chat_message
 {
     char Value[1024];
     struct chat_message *Next;
 } chat_message;
-
-typedef enum
-{
-    PacketType_PlayerList,
-} packet_type;
 
 typedef struct
 {

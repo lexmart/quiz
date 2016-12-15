@@ -1,11 +1,6 @@
 #include "stdio.h"
 #include "shared.h"
 
-#define PACKET_SIZE 2048
-#define SERVER_PORT "5658"
-#define SILENT_ERROR 0
-#include "networking.h"
-
 typedef struct
 {
     SOCKET ServerSocket;
@@ -23,13 +18,17 @@ ConnectToServer(network_state *Result, char *Name)
     Result->ServerSocket = ServerSocket;
     u_long Mode = 1;
     ioctlsocket(ServerSocket, FIONBIO, &Mode);
-    Sleep(1000);
-    Send(ServerSocket, Name, (int)strlen(Name) + 1);
+    Sleep(250);
+    
+    packet Packet = BuildPacket(PacketType_Name, Name, (int)strlen(Name));
+    Send(ServerSocket, &Packet);
 }
 
+#if 0
 internal void
 GetPlayerList(network_state *NetworkState, player *Players, int PlayersLength)
 {
+#if 0
     int BytesReceived = -1;
     while(BytesReceived <= 0)
     {
@@ -44,6 +43,15 @@ GetPlayerList(network_state *NetworkState, player *Players, int PlayersLength)
             printf("player: %s\n", Player->Name);
         }
     }
+#else
+    
+    packet PlayerListPacket = {0};
+    while(Recieve(NetworkState->ServerSocket, &PlayerListPacket) <= 0)
+    {
+        Sleep(50);
+    }
+    
+    #endif
 }
 
 internal void
@@ -78,6 +86,8 @@ ReceiveChatMessage(network_state *NetworkState, chat_message *Message)
     
     return Result;
 }
+
+#endif
 
 #if 0
 int main(int NumArguments, char *Arguments[])

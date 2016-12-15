@@ -187,9 +187,9 @@ DrawPlayers(game_state *GameState, screen *Screen)
     SDL_Color ForegroundColor = {223, 96, 14};
     SDL_Color BackgroundColor = {2, 2, 122};
     
-    for(int PlayerIndex = 0; PlayerIndex < GameState->NumPlayers; PlayerIndex++)
+    for(int PlayerIndex = 0; PlayerIndex < GameState->Players.NumPlayers; PlayerIndex++)
     {
-        player *Player = GameState->Players + PlayerIndex;
+        player *Player = GameState->Players.Contents + PlayerIndex;
         
         int DrawY = StartY + (PlayerIndex*GameState->Bitmaps.Player.Height) + + PlayerIndex*PadY;
         DrawBitmap(Screen, &GameState->Bitmaps.Player, DrawX + PadX, DrawY);
@@ -218,7 +218,7 @@ DrawInputLine(game_state *GameState, screen *Screen)
 internal void
 AddPlayer(game_state *GameState, char *Name)
 {
-    player *Player = GameState->Players + GameState->NumPlayers++;
+    player *Player = GameState->Players.Contents + GameState->Players.NumPlayers++;
     
     int ActualNameLength = (int)strlen(Name);
     for(int CharIndex = 0; CharIndex < ActualNameLength; CharIndex++)
@@ -235,9 +235,9 @@ AddPlayer(game_state *GameState, char *Name)
 internal void
 UpdatePlayerScore(game_state *GameState, char *Name, int NewScore)
 {
-    for(int PlayerIndex = 0; PlayerIndex < GameState->NumPlayers; PlayerIndex++)
+    for(int PlayerIndex = 0; PlayerIndex < GameState->Players.NumPlayers; PlayerIndex++)
     {
-        player *Player = GameState->Players + PlayerIndex;
+        player *Player = GameState->Players.Contents + PlayerIndex;
         if(!strcmp(Player->Name, Name))
         {
             Player->Score = NewScore;
@@ -250,15 +250,15 @@ SortPlayersByScore(game_state *GameState)
 {
     // NOTE: Just selection sort, number of players is small.
     
-    for(int SelectionIndex = 0; SelectionIndex < GameState->NumPlayers; SelectionIndex++)
+    for(int SelectionIndex = 0; SelectionIndex < GameState->Players.NumPlayers; SelectionIndex++)
     {
-        player *SelectionPlayer = GameState->Players + SelectionIndex;
+        player *SelectionPlayer = GameState->Players.Contents + SelectionIndex;
         
         player *NextHighestPlayer = SelectionPlayer;
         
-        for(int TestIndex = SelectionIndex + 1; TestIndex < GameState->NumPlayers; TestIndex++)
+        for(int TestIndex = SelectionIndex + 1; TestIndex < GameState->Players.NumPlayers; TestIndex++)
         {
-            player *TestPlayer = GameState->Players + TestIndex;
+            player *TestPlayer = GameState->Players.Contents + TestIndex;
             if(TestPlayer->Score > NextHighestPlayer->Score)
             {
                 NextHighestPlayer = TestPlayer;
@@ -344,7 +344,9 @@ ProcessKeyboardInput(game_state *GameState, network_state *NetworkState, keyboar
         else if(KeyPressed == '\r')
         {
             chat_message *NewMessage = CreateMessage(GameState, Arena, GameState->CurInputLine, 0);
-            SendChatMessage(NetworkState, NewMessage);
+            
+            packet MessagePacket = BuildPacket(PacketType_ChatMessage, (char *)NewMessage, sizeof(chat_message));
+            Send(NetworkState->ServerSocket, &MessagePacket);
             
             GameState->InputLineLength = 0;
             GameState->CurInputLine[0] = 0;
@@ -368,10 +370,9 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
         
         network_state *NetworkState = PushStruct(network_state, Arena);
         ConnectToServer(NetworkState, "Jose Rodriguez Antonio");
-        GetPlayerList(NetworkState, &GameState->Players[0], ArrayCount(GameState->Players));
-        ReceiveQuestion(NetworkState, &GameState->Q);
         GameState->NetworkState = NetworkState;
         
+        #if 0
         for(int PlayerIndex = 0; PlayerIndex < ArrayCount(GameState->Players); PlayerIndex++)
         {
             player *Player = GameState->Players + PlayerIndex;
@@ -380,6 +381,7 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
                 AddPlayer(GameState, &Player->Name[0]);
             }
         }
+        #endif
         
         GameState->Bitmaps.Trebek = LoadSprite("data/trebek.png");
         GameState->Bitmaps.Players = LoadSprite("data/players.png");
@@ -408,11 +410,26 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
     
     network_state *NetworkState = (network_state *)GameState->NetworkState;
     
-    chat_message TestMessage = {0};
-    while(ReceiveChatMessage(NetworkState, &TestMessage))
+    packet IncomingPacket = {0};
+    while(Recieve(NetworkState->ServerSocket, &IncomingPacket) > 0)
     {
-        chat_message *NewMessage = CreateMessage(GameState, Arena, TestMessage.Value, GameState->Messages);
-        GameState->Messages = NewMessage;
+        switch(IncomingPacket.PacketType)
+        {
+            case PacketType_PlayerList:
+            {
+                memcpy(&GameState->Players, IncomingPacket.Contents, sizeof(GameState->Players));
+            } break;
+            case PacketType_ChatMessage:
+            {
+                char *RawMessage = ((chat_message *)IncomingPacket.Contents)->Value;
+                chat_message *NewMessage = CreateMessage(GameState, Arena, RawMessage, GameState->Messages);
+                GameState->Messages = NewMessage;
+            } break;
+            case PacketType_Question:
+            {
+                printf("got a question");
+            } break;
+    }
     }
     
     SortPlayersByScore(GameState);

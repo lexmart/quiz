@@ -47,8 +47,7 @@ typedef struct
     
     bitmaps Bitmaps;
     
-    int NumPlayers;
-    player Players[8];
+    player_list Players;
     
     char CurInputLine[1024];
     int InputLineLength;
