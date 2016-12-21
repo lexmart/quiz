@@ -6,6 +6,7 @@ typedef enum
 {
     PacketType_PlayerList,
     PacketType_ChatMessage,
+    PacketType_SkipVote,
     PacketType_Winner,
     PacketType_Question,
     PacketType_Name
@@ -93,7 +94,7 @@ Listen(char *Port)
     struct addrinfo Hints;
     
     ZeroMemory(&Hints, sizeof(Hints));
-    Hints.ai_family = AF_INET;
+    Hints.ai_family = AF_INET6;
     Hints.ai_socktype = SOCK_STREAM;
     Hints.ai_protocol = IPPROTO_TCP;
     Hints.ai_flags = AI_PASSIVE;
@@ -149,11 +150,39 @@ Send(SOCKET Socket, packet *Packet)
 }
 
 int
-Recieve(SOCKET Socket, packet *Packet)
+Recieve(SOCKET Socket, char *Memory, int NumBytes)
 {
-    int Bytes = recv(Socket, (char *)Packet, sizeof(packet), 0);
+    int Bytes = recv(Socket, (char *)Memory, NumBytes, 0);
     
     return Bytes;
+}
+
+int
+TryRecievePacket(SOCKET Socket, packet *Packet)
+{
+    char *Memory = (char *)Packet;
+    int TotalBytesRecieved = Recieve(Socket, Memory, sizeof(packet));
+    
+    if(TotalBytesRecieved > 0)
+    {
+        Memory += TotalBytesRecieved;
+        
+        while(TotalBytesRecieved < sizeof(Packet))
+        {
+            int BytesLeft = sizeof(packet) - TotalBytesRecieved;
+            
+            int BytesRecieved = Recieve(Socket, Memory, BytesLeft);
+            while(BytesRecieved <= 0)
+            {
+                BytesRecieved = Recieve(Socket, Memory, BytesLeft);
+            }
+            
+            Memory += BytesRecieved;
+            TotalBytesRecieved += BytesRecieved;
+        }
+    }
+    
+    return TotalBytesRecieved;
 }
 
 #define NETWORKING_H

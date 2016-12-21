@@ -96,7 +96,6 @@ DrawBitmap(screen *Screen, bitmap *Bitmap, int MinX, int MinY)
 {
     int MaxX = MinX + Bitmap->Width - 1;
     int MaxY = MinY + Bitmap->Height - 1;
-    //Assert((MinX >= 0) && (MinY >= 0) && (MaxX < Screen->Width) && (MaxY < Screen->Height));
     
     u32 *ScreenRow = Screen->Memory + MinY*Screen->Width + MinX;
     u32 *BitmapPixel = Bitmap->Memory;
@@ -142,7 +141,6 @@ IsValidDrawCharacter(char Char)
     return Result;
 }
 
-// TODO: No paramter, see below
 internal void
 DrawTopic(game_state *GameState, screen *Screen, char *Topic)
 {
@@ -153,12 +151,11 @@ DrawTopic(game_state *GameState, screen *Screen, char *Topic)
     int Width = GameState->Bitmaps.Board.Width - DrawX;
     int Height = GameState->Bitmaps.Board.Height - PadY;
     
-    SDL_Color ForegroundColor = {223, 96, 14};
+    SDL_Color ForegroundColor = {211, 160, 129};
     SDL_Color BackgroundColor = {2, 2, 122};
     DrawString(DrawX, DrawY, Width, Height, Topic, GameState->Font, GameState->ScreenSurface, ForegroundColor, BackgroundColor);
 }
 
-// TODO: No parameter, just draw question from game_state
 internal void
 DrawQuestion(game_state *GameState, screen *Screen, char *Question)
 {
@@ -169,7 +166,7 @@ DrawQuestion(game_state *GameState, screen *Screen, char *Question)
     int Width = GameState->Bitmaps.Board.Width - 2*DrawX;
     int Height = GameState->Bitmaps.Board.Height;
     
-    SDL_Color ForegroundColor = {223, 96, 14};
+    SDL_Color ForegroundColor = {211, 160, 129};
     SDL_Color BackgroundColor = {2, 2, 122};
     DrawString(DrawX, DrawY, Width, Height, Question, GameState->Font, GameState->ScreenSurface, ForegroundColor, BackgroundColor);
 }
@@ -184,7 +181,7 @@ DrawPlayers(game_state *GameState, screen *Screen)
     int NameTextPadX = 10;
     int ScoreTextPadX = 128 + 14;
     
-    SDL_Color ForegroundColor = {223, 96, 14};
+    SDL_Color ForegroundColor = {211, 160, 129};
     SDL_Color BackgroundColor = {2, 2, 122};
     
     for(int PlayerIndex = 0; PlayerIndex < GameState->Players.NumPlayers; PlayerIndex++)
@@ -194,7 +191,8 @@ DrawPlayers(game_state *GameState, screen *Screen)
         int DrawY = StartY + (PlayerIndex*GameState->Bitmaps.Player.Height) + + PlayerIndex*PadY;
         DrawBitmap(Screen, &GameState->Bitmaps.Player, DrawX + PadX, DrawY);
         
-        DrawString(DrawX + NameTextPadX, DrawY + PadY, GameState->Bitmaps.Player.Width, GameState->Bitmaps.Player.Height, Player->Name, GameState->Font, GameState->ScreenSurface, ForegroundColor, BackgroundColor);
+        DrawString(DrawX + NameTextPadX, DrawY + PadY, GameState->Bitmaps.Player.Width, GameState->Bitmaps.Player.Height, 
+                   Player->Name, GameState->Font, GameState->ScreenSurface, ForegroundColor, BackgroundColor);
 
         char ScoreText[16];
         sprintf(ScoreText, "%03d", Player->Score);
@@ -210,7 +208,7 @@ DrawInputLine(game_state *GameState, screen *Screen)
     int Width = GameState->Bitmaps.Board.Width - 2*DrawX;
     int Height = 17;
 
-    SDL_Color ForegroundColor = {223, 96, 14};
+    SDL_Color ForegroundColor = {211, 160, 129};
     SDL_Color BackgroundColor = {3, 3, 183};
     DrawString(DrawX, DrawY, Width, Height, GameState->CurInputLine, GameState->Font, GameState->ScreenSurface, ForegroundColor, BackgroundColor);
 }
@@ -321,11 +319,6 @@ CreateKeyPress(keyboard *Keyboard, memory_arena *MemoryArena, char Value, key_pr
 internal void
 ProcessKeyboardInput(game_state *GameState, network_state *NetworkState, keyboard *Keyboard, memory_arena *Arena)
 {
-    if(Keyboard->Input)
-    {
-        int Stub = 0;
-    }
-    
     while(Keyboard->Input)
     {
         key_press *CurKeyPress = Keyboard->Input;
@@ -341,12 +334,27 @@ ProcessKeyboardInput(game_state *GameState, network_state *NetworkState, keyboar
         {
             GameState->CurInputLine[--GameState->InputLineLength] = 0;
         }
-        else if(KeyPressed == '\r')
+        else if((KeyPressed == '\r') && (NetworkState != 0))
         {
             chat_message *NewMessage = CreateMessage(GameState, Arena, GameState->CurInputLine, 0);
             
-            packet MessagePacket = BuildPacket(PacketType_ChatMessage, (char *)NewMessage, sizeof(chat_message));
+            packet_type PacketType = PacketType_ChatMessage;
+            if(!strcmp(GameState->CurInputLine, "!skip"))
+            {
+                PacketType = PacketType_SkipVote;
+            }
+            
+            packet MessagePacket = BuildPacket(PacketType, (char *)NewMessage, sizeof(chat_message));
             Send(NetworkState->ServerSocket, &MessagePacket);
+            
+            GameState->InputLineLength = 0;
+            GameState->CurInputLine[0] = 0;
+        }
+        else if((KeyPressed == '\r') && (NetworkState == 0))
+        {
+            NetworkState = PushStruct(network_state, Arena);
+            ConnectToServer(NetworkState, GameState->CurInputLine);
+            GameState->NetworkState = NetworkState;
             
             GameState->InputLineLength = 0;
             GameState->CurInputLine[0] = 0;
@@ -370,21 +378,6 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
         
         GameState->Initialized = true;
         
-        network_state *NetworkState = PushStruct(network_state, Arena);
-        ConnectToServer(NetworkState, "Jose Rodriguez Antonio");
-        GameState->NetworkState = NetworkState;
-        
-        #if 0
-        for(int PlayerIndex = 0; PlayerIndex < ArrayCount(GameState->Players); PlayerIndex++)
-        {
-            player *Player = GameState->Players + PlayerIndex;
-            if(Player->Name[0] != 0)
-            {
-                AddPlayer(GameState, &Player->Name[0]);
-            }
-        }
-        #endif
-        
         GameState->Bitmaps.Trebek = LoadSprite("data/trebek.png");
         GameState->Bitmaps.Players = LoadSprite("data/players.png");
         GameState->Bitmaps.Player = LoadSprite("data/player.png");
@@ -403,14 +396,20 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
         }
         fclose(FileHandle);
         
-         GameState->Messages = CreateMessage(GameState, Arena, "Waiting for server...", 0);
+         GameState->Messages = CreateMessage(GameState, Arena, "Enter name...", 0);
     }
     
     network_state *NetworkState = (network_state *)GameState->NetworkState;
     
-    packet IncomingPacket = {0};
-    while(Recieve(NetworkState->ServerSocket, &IncomingPacket) > 0)
+    if(NetworkState != 0)
     {
+    packet IncomingPacket = {0};
+    
+    int BytesRecieved = TryRecievePacket(NetworkState->ServerSocket, &IncomingPacket);
+    while(BytesRecieved > 0)
+    {
+        printf("recived %d\n", BytesRecieved);
+        
         switch(IncomingPacket.PacketType)
         {
             case PacketType_PlayerList:
@@ -438,7 +437,10 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
                 memcpy(&GameState->CurrentQuestion, NewQuestion, sizeof(question));
             } break;
     }
-    }
+    
+    BytesRecieved = TryRecievePacket(NetworkState->ServerSocket, &IncomingPacket);
+}
+}
     
     SortPlayersByScore(GameState);
     
@@ -454,7 +456,7 @@ UpdateAndRender(void *Memory, int MemoryInBytes, screen *Screen, keyboard *Keybo
     int MessageHeight = 17;
     int MessageWidth = GameState->Bitmaps.Board.Width - 2*DrawX;
     chat_message *CurMessage = GameState->Messages;
-    SDL_Color ForegroundColor = {223, 96, 14};
+    SDL_Color ForegroundColor = {211, 160, 129};
     SDL_Color BackgroundColor = {3, 3, 183};
     
     int MinY = 150 + GameState->Bitmaps.Trebek.Height;

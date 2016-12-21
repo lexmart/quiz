@@ -10,8 +10,9 @@ REM -Zi = Creates debug information for Visual Studio debugger (Do I need to tur
 REM -LD = Build DLL file
 REM -Od = Turn off all optimizations
 REM -incremental:no = To stop annyoing full link message
+REM Zp[1|2|4|8|16] pad struct on x-byte boundries
 
-set CompilerFlags=%WarningFlags% %VariableFlags% -FC -Zi -Od
+set CompilerFlags=%WarningFlags% %VariableFlags% -FC -Zi -Od -Zp1
 set LinkerFlags=-incremental:no -LIBPATH:../chip8/SDL/lib/x64/SDL2.lib
 set ExternalLibraries=User32.lib Gdi32.lib Winmm.lib
 

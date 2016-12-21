@@ -93,11 +93,6 @@ GenerateQuestion(FILE *FileHandle)
         Result.Answer[CharIndex++] = Char;
     }
     
-    // TODO: Make FileHandle a double pointer
-    // TODO: Don't close the filehandle, move it up to the next question.
-    // TODO: If there's no next question, then close FileHandle and open new FileHandle at random location
-    // TODO: On serverside, if everyone says "skip", then the server just jumps to a new random place in the file!
-    
     if(fgetc(FileHandle) == '|')
     {
     ungetc('|', FileHandle);
@@ -107,5 +102,40 @@ GenerateQuestion(FILE *FileHandle)
         InvalidCodePath;
     }
     
+    printf("answer: %s\n", Result.Answer);
+    
     return Result;
+}
+
+internal void
+SkipQuestion(FILE *FileHandle)
+{
+     fseek(FileHandle, 0L, SEEK_END);
+    int FileSize = ftell(FileHandle);
+    int RandomByteOffset = rand() % FileSize;
+    
+    rewind(FileHandle);
+    fseek(FileHandle, RandomByteOffset, 0);
+    
+    char Char = fgetc(FileHandle);
+    while((Char != EOF) && (Char != '\n'))
+    {
+        Char = fgetc(FileHandle);
+    }
+    if(Char == EOF)
+    {
+        SkipQuestion(FileHandle);
+    }
+    else
+    {
+        Char = fgetc(FileHandle);
+        if(Char != '|')
+        {
+            SkipQuestion(FileHandle);
+        }
+        else
+        {
+            ungetc('|', FileHandle);
+        }
+    }
 }

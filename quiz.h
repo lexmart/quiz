@@ -58,6 +58,8 @@ typedef struct
     question CurrentQuestion;
     
     void *NetworkState;
+    
+    b32 NameEntered;
 } game_state;
 
 #define QUIZ_H

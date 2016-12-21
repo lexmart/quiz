@@ -7,14 +7,15 @@
 #include "networking.h"
 #include "shared.h"
 #include "quiz_questions.c"
-
-// skip if everyone says "skip"? or maybe just keep the session short?
+#include "time.h"
 
 /*
 TODO
-Implement commands such as 
 !skip - skips current question (we'll probably have long period like 45sec/question)
 Maybe have GenerateQuestion jump to new category once its done with category stream?
+
+add timer to question
+
 */
 
 internal void
@@ -29,6 +30,8 @@ BroadcastPacket(SOCKET *PlayerSockets, int NumPlayers, packet *Packet)
 
 int main(int NumArguments, char *Arguments[])
 {
+    srand(time(0));
+    
 	if(NumArguments >= 2)
 	{
 		char *NumPlayersString = Arguments[1];
@@ -52,7 +55,7 @@ int main(int NumArguments, char *Arguments[])
 			SOCKET ClientSocket = PlayerSockets[PlayerIndex];
 
             packet Packet = {0};
-            while(Recieve(ClientSocket, &Packet) <= 0)
+            while(TryRecievePacket(ClientSocket, &Packet) <= 0)
             {
                 Sleep(10);
             }
@@ -71,23 +74,14 @@ int main(int NumArguments, char *Arguments[])
         sprintf(WelcomeMessage, "Alex Trebek: Welcome to Jeopardy, I'm your host, Alex Trebrek.");
         packet WelcomeMessagePacket = BuildPacket(PacketType_ChatMessage, (char *)WelcomeMessage, (int)strlen(WelcomeMessage));
         BroadcastPacket(PlayerSockets, NumPlayers, &WelcomeMessagePacket);
-        sprintf(WelcomeMessagePacket.Contents, "Alex Trebek: Correct answers must score at least %.2f", CorrectAnswerScore);
-        BroadcastPacket(PlayerSockets, NumPlayers, &WelcomeMessagePacket);
         sprintf(WelcomeMessagePacket.Contents, "Alex Trebek: Good luck.", CorrectAnswerScore);
         BroadcastPacket(PlayerSockets, NumPlayers, &WelcomeMessagePacket);
         
         packet PlayerListPacket = BuildPacket(PacketType_PlayerList, (char *)&Players, sizeof(Players));
         BroadcastPacket(PlayerSockets, NumPlayers, &PlayerListPacket);
         
-        #if 0
-		for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
-		{
-			SOCKET ClientSocket = PlayerSockets[PlayerIndex];
-			Send(ClientSocket, (char *)Players, sizeof(Players));
-		}
-        #endif
-        
         FILE *FileHandle = fopen("test.txt", "r");
+        SkipQuestion(FileHandle);
         question Question = GenerateQuestion(FileHandle);
         Question = GenerateQuestion(FileHandle);
         Question = GenerateQuestion(FileHandle);
@@ -95,6 +89,85 @@ int main(int NumArguments, char *Arguments[])
         packet QuestionPacket = BuildPacket(PacketType_Question, (char *)&Question, sizeof(question));
         BroadcastPacket(PlayerSockets, NumPlayers, &QuestionPacket);
         
+        b32 *SkipVotes = malloc(sizeof(b32)*NumPlayers);
+        memset(SkipVotes, 0, sizeof(b32)*NumPlayers);
+        
+        while(true)
+        {
+            Sleep(10);
+            
+            int NumSkipVotes = 0;
+            
+            for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
+            {
+                packet RecievedPacket = {0};
+                SOCKET PlayerSocket = PlayerSockets[PlayerIndex];
+                player *Player = &Players.Contents[PlayerIndex];
+                int BytesRecieved = TryRecievePacket(PlayerSocket, &RecievedPacket);
+                NumSkipVotes += SkipVotes[PlayerIndex];
+                
+                if(BytesRecieved > 0)
+                {
+                    if(RecievedPacket.PacketType == PacketType_ChatMessage)
+                    {
+                        printf("received chat message\n");
+                        chat_message *ChatMessage = (chat_message *)&RecievedPacket.Contents;
+                        
+                        if(strlen(ChatMessage->Value) > 0)
+                        {
+                            chat_message PlayerMessage = {0};
+                            sprintf(&PlayerMessage.Value[0], "%s: %s", Player->Name, RecievedPacket.Contents);
+                            packet PlayerMessagePacket = 
+                                BuildPacket(PacketType_ChatMessage, (char *)&PlayerMessage, sizeof(chat_message));
+                            BroadcastPacket(PlayerSockets, NumPlayers, &PlayerMessagePacket);
+                            
+                            r32 AnswerScore = 1.0f - NormalizedDistance(ChatMessage->Value, &Question);
+                            
+                            if(AnswerScore >= CorrectAnswerScore)
+                            {
+                                chat_message ResponseMessage;
+                                sprintf(ResponseMessage.Value, "Alex Trebek: %s wins the round (answer score was %.2f)", 
+                                        Player->Name, AnswerScore);
+                                
+                                packet CorrectResponsePacket = BuildPacket(PacketType_Winner,
+                                                                           (char *)&ResponseMessage,
+                                                                           sizeof(CorrectResponsePacket));
+                                BroadcastPacket(PlayerSockets, NumPlayers, &CorrectResponsePacket);
+                                
+                                Question = GenerateQuestion(FileHandle);
+                                QuestionPacket = BuildPacket(PacketType_Question, (char *)&Question, sizeof(question));
+                                BroadcastPacket(PlayerSockets, NumPlayers, &QuestionPacket);
+                                
+                                Player->Score++;
+                                PlayerListPacket = BuildPacket(PacketType_PlayerList, (char *)&Players, sizeof(Players));
+                                BroadcastPacket(PlayerSockets, NumPlayers, &PlayerListPacket);
+                                
+                                memset(SkipVotes, 0, sizeof(b32)*NumPlayers);
+                            }
+                        }
+                    }
+                }
+                else if(RecievedPacket.PacketType == PacketType_SkipVote)
+                {
+                    chat_message PlayerMessage = {0};
+                    sprintf(&PlayerMessage.Value[0], "%s: !skip", Player->Name);
+                    packet PlayerMessagePacket = 
+                        BuildPacket(PacketType_ChatMessage, (char *)&PlayerMessage, sizeof(chat_message));
+                    BroadcastPacket(PlayerSockets, NumPlayers, &PlayerMessagePacket);
+                    
+                    SkipVotes[PlayerIndex] = true;
+                }
+            }
+            
+            if(NumSkipVotes == NumPlayers)
+            {
+                Question = GenerateQuestion(FileHandle);
+                QuestionPacket = BuildPacket(PacketType_Question, (char *)&Question, sizeof(question));
+                BroadcastPacket(PlayerSockets, NumPlayers, &QuestionPacket);
+            }
+        }
+        
+        #if 0
         while(true)
         {
         for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
@@ -144,6 +217,7 @@ int main(int NumArguments, char *Arguments[])
                             }
                             else
                             {
+                                #if 0
                                 chat_message ResponseMessage;
                                 sprintf(ResponseMessage.Value, "Alex Trebek: %s has score %.2f", 
                                         ReceivedPacket.Contents, AnswerScore);
@@ -152,6 +226,7 @@ int main(int NumArguments, char *Arguments[])
                                                                              (char *)&ResponseMessage,
                                                                              sizeof(ResponseMessage));
                                 BroadcastPacket(PlayerSockets, NumPlayers, &IncorrectResponsePacket);
+                                #endif
                             }
                         }
                     } break;
@@ -159,6 +234,7 @@ int main(int NumArguments, char *Arguments[])
         }
         }
     }
+    #endif
         
 		for(int PlayerIndex = 0; PlayerIndex < NumPlayers; PlayerIndex++)
 		{
