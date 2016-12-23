@@ -1,0 +1,102 @@
+<html>
+<style>
+body {
+	font-family: "Lucida Console", Monaco, monospace;
+	background-color: black;
+	color: white;
+	width: 600px;
+	padding-left: 100px;
+}
+input {
+	font-family: "Lucida Console", Monaco, monospace;
+	background-color: black;
+	color: white;
+	margin-top: 15px;
+	width: 600px;
+}
+textarea {
+	font-family: "Lucida Console", Monaco, monospace;
+	background-color: black;
+	color: white;
+	margin-top: 15px;
+	height: 400px;
+	width: 600px;
+}
+div {
+	padding-top: 15px;
+}
+</style>
+
+<script src="https://cdn.socket.io/socket.io-1.4.5.js"></script>
+<script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+
+<body>
+<div id="initmode">
+<div>Multiplayer Alex Trebek Simulator</div>
+<div>Name: <input id="name"></input></div>
+</div>
+
+<div id="gamemode">
+	<div>Time Left: <span id="time"></span></div>
+	<div>Category: <span id="category"></span></div>
+	<div>Question: <span id="question"></span></div>
+	<textarea readonly id="chat"></textarea>
+	<input id="msgbox"></input>
+</div>
+</body>
+
+<script>
+
+var name = "";
+
+$(document).ready(function(){
+	$("#gamemode").hide();
+
+	$("#name").on('keyup', function(e){
+		if(e.keyCode == 13)
+		{
+			$("#initmode").hide();
+			$("#gamemode").show();
+			name = $("#name").val()
+			startClient();
+		}
+	});
+});
+
+function addMessage(msg)
+{
+	$("#chat").val(msg + "\n" + $("#chat").val());
+}
+
+function startClient() {
+	var socket = io();
+
+	socket.on('chat message', function(msg){
+		addMessage(msg);
+	});
+
+	socket.on('new question', function(category, question, secondsLeft){
+		$("#category").text(category);
+		$("#question").text(question);
+		$("#time").text(secondsLeft);
+	});
+
+	setInterval(function() {
+		var newTime = parseInt($("#time").text()) - 1;
+		$("#time").text(newTime);
+		if(isNaN(newTime) || newTime < 0) {
+			$("#time").text("server probably down, refresh?");
+		}
+	}, 1000);
+
+	$("#msgbox").on('keyup', function(e){
+		if(e.keyCode == 13){
+			socket.emit('chat message', name, $("#msgbox").val());
+			$("#msgbox").val("");
+		}
+	});
+}
+
+
+</script>
+</html>

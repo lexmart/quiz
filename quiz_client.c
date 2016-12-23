@@ -12,7 +12,7 @@ internal void
 ConnectToServer(network_state *Result, char *Name)
 {
     NetworkStartup();
-    SOCKET ServerSocket = Connect("2600:8801:2a80:15a:1566:279c:e7fe:effe", SERVER_PORT);
+    SOCKET ServerSocket = Connect("2600:8801:2a80:15a:501c:db3:efb4:ba90", SERVER_PORT);
     Result->ServerSocket = ServerSocket;
     u_long Mode = 1;
     ioctlsocket(ServerSocket, FIONBIO, &Mode);

@@ -6,7 +6,7 @@
 #include "SDL_TTF.h"
 
 #define PACKET_SIZE 2048
-#define SERVER_PORT "5658"
+#define SERVER_PORT "7937"
 #define SILENT_ERROR 0
 
 #include "shared.h"
